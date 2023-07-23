@@ -61,8 +61,14 @@ select('#controls').onclick = (evt) ->
         return unless evt.target.classList.contains 'button'
 
         label = evt.target.innerText
-        seaCode = input.getValue()
-        tokens = tokenize seaCode
+
+        if label is 'help'
+            output.setValue help
+            output.gotoLine 0
+            return
+
+        ryCode = input.getValue()
+        tokens = tokenize ryCode
         ast = parse tokens
         jsCode = translate ast
 
@@ -79,8 +85,6 @@ select('#controls').onclick = (evt) ->
             eval jsCode
         if label is 'save'
             save()
-        if label is 'help'
-            output.setValue help
 
         output.gotoLine 1000000
 
@@ -95,7 +99,7 @@ addEventListener "keydown", (evt) ->
 
 vault.set "animals",
 '''
-animals = array 'rabits 'snakes 'whales 'ducks
+animals = array #rabits #snakes #whales #ducks
 for animal in animals
     say "i like [ animal ]"
 say "they are all cute"
@@ -106,5 +110,7 @@ help =
 to save your code, put "[save: name]" on the first line and click save.
 replace name with your own name. names must match "[a-zA-Z0-9]+".
 
-to load your code, write "load 'name" in the editor and click "evaluate".
+to load your code, write "load #name" in the editor and click "evaluate".
+
+try "load #animals" to see an example program.
 '''

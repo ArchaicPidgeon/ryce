@@ -83,14 +83,19 @@
   load('last');
 
   select('#controls').onclick = function(evt) {
-    var ast, error, jsCode, label, seaCode, tokens;
+    var ast, error, jsCode, label, ryCode, tokens;
     try {
       if (!evt.target.classList.contains('button')) {
         return;
       }
       label = evt.target.innerText;
-      seaCode = input.getValue();
-      tokens = tokenize(seaCode);
+      if (label === 'help') {
+        output.setValue(help);
+        output.gotoLine(0);
+        return;
+      }
+      ryCode = input.getValue();
+      tokens = tokenize(ryCode);
       ast = parse(tokens);
       jsCode = translate(ast);
       vault.set('last', input.getValue());
@@ -110,9 +115,6 @@
       if (label === 'save') {
         save();
       }
-      if (label === 'help') {
-        output.setValue(help);
-      }
       return output.gotoLine(1000000);
     } catch (error1) {
       error = error1;
@@ -125,7 +127,7 @@
 
   //log evt
   //evt.preventDefault()
-  vault.set("animals", `animals = array 'rabits 'snakes 'whales 'ducks
+  vault.set("animals", `animals = array #rabits #snakes #whales #ducks
 for animal in animals
     say "i like [ animal ]"
 say "they are all cute"`);
@@ -133,6 +135,8 @@ say "they are all cute"`);
   help = `to save your code, put "[save: name]" on the first line and click save.
 replace name with your own name. names must match "[a-zA-Z0-9]+".
 
-to load your code, write "load 'name" in the editor and click "evaluate".`;
+to load your code, write "load #name" in the editor and click "evaluate".
+
+try "load #animals" to see an example program.`;
 
 }).call(this);
