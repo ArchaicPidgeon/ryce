@@ -367,7 +367,7 @@ parse = (tokenStream) ->
             else if token.type is 'newline'
                 #log endExpr
                 #break if endExpr
-                if nextToken?.type in ['dotName', 'biOp']
+                if nextToken?.type in ['dotName', 'biOp', 'pipe']
                 then parseTerminal()
                 else break
             else break
@@ -869,7 +869,7 @@ parse = (tokenStream) ->
         else if token.content is 'for'
             content.push parseFor()
         else if token.content in ['break', 'continue']
-            content.push parseTerminal()
+            content.push parseLoopControl()
         else if token.content is 'do'
             parseTerminal()
             throw 'parseConditional' unless canStartHead token

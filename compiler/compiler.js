@@ -473,7 +473,7 @@
         } else if (token.type === 'newline') {
           //log endExpr
           //break if endExpr
-          if ((ref1 = nextToken != null ? nextToken.type : void 0) === 'dotName' || ref1 === 'biOp') {
+          if ((ref1 = nextToken != null ? nextToken.type : void 0) === 'dotName' || ref1 === 'biOp' || ref1 === 'pipe') {
             parseTerminal();
           } else {
             break;
@@ -1161,7 +1161,7 @@
       } else if (token.content === 'for') {
         content.push(parseFor());
       } else if ((ref = token.content) === 'break' || ref === 'continue') {
-        content.push(parseTerminal());
+        content.push(parseLoopControl());
       } else if (token.content === 'do') {
         parseTerminal();
         if (!canStartHead(token)) {

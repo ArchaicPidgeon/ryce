@@ -26,12 +26,19 @@ window.input = input
 window.output = output
 
 format = (code) -> prettier.format code, parser: 'babel', plugins: prettierPlugins
+
 array = (...arr) -> [...arr]
 object = (obj) -> obj
+
 say = (...args) ->
     text =  output.getValue()
     newline = if text.length > 0 then '\n' else ''
     output.setValue text + newline + args.join(' ')
+
+log = say
+console.log = say
+
+run = (f) -> f()
 
 window.getCompilerOptions = ->
     res = input.getValue().match /^([ \n]|\[.*?\])*/
@@ -52,7 +59,7 @@ load = (name) ->
     input.gotoLine 0
     input.focus()
 
-load 'last'
+# load 'last'
 
 select('#controls').onclick = (evt) ->
 
@@ -67,7 +74,7 @@ select('#controls').onclick = (evt) ->
             output.gotoLine 0
             return
 
-        ryCode = input.getValue()
+        ryCode = input.getValue().replaceAll('\t', '    ')
         tokens = tokenize ryCode
         ast = parse tokens
         jsCode = translate ast
@@ -99,7 +106,7 @@ addEventListener "keydown", (evt) ->
 
 vault.set "animals",
 '''
-animals = array #rabits #snakes #whales #ducks
+animals = array #rabbits #snakes #whales #ducks
 for animal in animals
     say "i like [ animal ]"
 say "they are all cute"

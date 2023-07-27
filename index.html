@@ -1,90 +1,622 @@
 <!doctype html>
+
+<html lang="en">
+<meta charset="utf-8">
+
 <title>ryce</title>
-<link rel="icon" href="img/faviconA.ico">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.16.0/ace.js" integrity="sha512-Km4SIAd8d2xB73+j5NmOjzIxriadCWR9xapO/YARlvfwkgrWneSpV/6GeaRzVLNckFHzUn9Iv1oGbsDW/HtTZQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="https://unpkg.com/prettier@2.8.7/standalone.js"></script>
-<script src="https://unpkg.com/prettier@2.8.7/parser-babel.js"></script>
-<script src="compiler/compiler.js"></script>
-<script src="page/libra.js"></script>
-<script src="page/script.js" defer></script>
-<div id="input">say "hello"</div>
-<div id="output"></div>
-<div id="controls">
-    <div class="button">tokens</div>
-    <div class="button">parse tree</div>
-    <div class="button">javascript</div>
-    <div class="button">evaluate</div>
-    <div class="button">save</div>
-    <div class="button">help</div>
+<link rel="icon" href="img/faviconC.ico">
+
+<link rel="stylesheet" href="style.css">
+
+<div class="scrollBox">
+
+<h1 style="text-align: center; font-size: 40px;"> the ryce programming language </h1>
+<br>
+<div style="display: grid; place-content: center; text-align: center;">
+<div>
+<img style="height: 256px; border-radius: 12px;" src="img/ryce.svg" alt="the ryce logo: an illustration of a bowl of rice, with 'ryce' written on it in a cute font."><br>
+<a href="./try">try it online</a> | <a href="#learning-how-to-cook">jump to guide</a>
 </div>
+</div>
+<hr>
 
-<script>
+<h2 id="state-of-the-project">state of the project</h2>
+<p>ryce is very much a personal project. my goal was to create a language that&#39;s fun to use, and easy to read, to me, personally.</p>
+<p>i have not used it all that much yet, but i think i like the way it turned out. there are certainly still some bugs, and the error messages when trying to compile invalid code are less than helpful, but it&#39;s usable.</p>
+<p>ryce isn&#39;t going to be the next big language. it is not, and probably never will be, production ready.</p>
+<p>that said, if you find any use in it, it&#39;s MIT licenced. use it, fork* it, modify it, or eat it for lunch. i hope it tastes good.</p>
+<p>(* actually, i&#39;d prefer it if you used a spork.)</p>
+<hr>
+<h2 id="whats-different-about-ryce">what&#39;s different about ryce</h2>
+<p>ryce compiles to javascript. it&#39;s inspired by livescript and coffeescript, two languages that also compile to JS. let&#39;s talk about some things i don&#39;t like about these languages, and how ryce does them differently.</p>
+<h3 id="variable-declaration-and-scope">variable declaration and scope</h3>
+<p>in javascript, variables have to be explicitly declared. there are three ways to do this.</p>
+<p><code>var</code> uses function scope. the declaration is automatically moved to the top of the scope, so you can assign to a var before it&#39;s declared.</p>
+<p><code>let</code> uses block scope. assigning to it before it&#39;s declared throws an error.</p>
+<p><code>const</code> uses block scope. you cannot reassign to a <code>const</code>, but it doesn&#39;t protect it&#39;s value from being changed. (ie. if it holds an array, you can still add values to that array, but you can&#39;t reassign it to a different array.)</p>
+<p>if you forget to declare a variable, you might accidentally create a global variable. unless you&#39;re in strict mode. then it will just throw an error.</p>
+<p>... this is just a mess.</p>
+<p>in coffeescript, there are only vars. some people may not like that, because they prefer block scope over function scope, but i think function scope is fine.</p>
+<p>you don&#39;t even have to declare variables. the compiler does it for you. actually, you <em>can&#39;t</em> declare variables and the compiler only declares one, if there isn&#39;t already a variable of that name in an outer scope. so how do you shadow a variable? well, ya don&#39;t.</p>
+<p>coffeescript thinks shadowing variables is bad, so you can&#39;t do it. unless you use a function parameter. that&#39;s allowed for some reason.</p>
+<pre><code>x = 1
+foo = (x) -&gt; x += 1
+foo()
+console.log(x)  # still 1
+</code></pre>
+<p>this is weird, and as far as i can tell, no one likes it. i don&#39;t like.</p>
+<p>in livescript, there are only vars. well, there is a <code>let</code> keyword, but it does something different.
+there&#39;s a <code>const</code> keyword too, but it&#39;s checked at compile time and actually compiles to a <code>var</code>.
+so there are only vars. kinda.</p>
+<p>in livescript, you don&#39;t have to declare variables either (but you can, if you want to). <code>x = 5</code> automatically adds <code>var x</code> in that scope. so how do you <em>not</em> shadow a variable? easy, ask a friendly walrus for help.</p>
+<pre><code>x = 5
+do -&gt;
+    x = 10
+console.log x    # still 5
+</code></pre>
+<pre><code>x = 5
+do -&gt;
+    x := 10
+console.log x    # it&#39;s 10!
+</code></pre>
+<p><code>:=</code> is sometimes called the walrus operator. two eyes, two tusks. you get it. you are smart.</p>
+<p>this makes sense, right? don&#39;t want to declare a variable in the current scope? use <code>:=</code>.
+or <code>+=</code> and its many siblings. those work too.</p>
+<pre><code>x = 5
+do -&gt;
+    x += 10
+console.log x    # 15
+</code></pre>
+<p>great. but what happens if we mix these different operators?</p>
+<pre><code>x = 5
+do -&gt;
+    x := 10
+    x = 0
+console.log x    # ????
+</code></pre>
+<p>livescript gives us a compiler error here. this is good. allowing this would just be confusing.</p>
+<pre><code>x = 5
+do -&gt;
+    x = 0
+    x := 10
+console.log x    # 5
+</code></pre>
+<p>... oh livescript, you were so close to getting it right.</p>
+<p>in ryce, there are only vars.  you can declare one with <code>var x</code>, but you don&#39;t have to. <code>x = 5</code> automatically adds <code>var x</code> in that scope. if you don&#39;t want that, you can use <code>outer x</code> . it works like <code>nonlocal x</code> in python, with fewer characters.</p>
+<pre><code>x = 5
+run =&gt;
+    outer x
+    x = 10
+console:log x    // 10
+</code></pre>
+<p>tail assignment (<code>5 + 2 :: x</code>) also adds <code>var x</code>.</p>
+<p>updating assignment (<code>x! + 10</code>) does not.</p>
+<p>there is one important exception to these rules. in <code>-&gt;</code> and <code>{}</code> functions, the compiler will not add vars. they only consist of a single expression, so assigning to a local variable doesn&#39;t make much sense anyway.</p>
+<pre><code>// declare variable &#39;keyCode&#39;
+var keyCode
 
-</script>
-
-<style>
-
-#input {
-    border-radius: 8px;
+// update &#39;keyCode&#39; from inside the event handler
+addEventListener #keyup -&gt; e, keyCode = e:keyCode
+</code></pre>
+<h3 id="visual-clutter">visual clutter</h3>
+<pre><code>function foo (xs, y) {
+    while (xs.pop() &gt; y) {
+        console.log(&quot;greater&quot;);
+    }
 }
+</code></pre>
+<p>javascript, like many other languages, has all these annoying little chracters that just get in the way. parens around conditions and function arguments, curly braces, semicolons, etc.
+i don&#39;t like em. at least you don&#39;t <em>have</em> to write the semicolons. (no really, you don&#39;t. it&#39;ll be fine.)</p>
+<p>coffeescript and livescript do this better.</p>
+<pre><code># coffeescript/livescript
 
-#output {
-    border-radius: 8px;
-    background: #161616;
-    white-space: pre-wrap;
-}
+foo = (xs, y) -&gt;
+    while xs.pop() &gt; y
+        console.log &quot;greater&quot;
+</code></pre>
+<pre><code># livescript
 
-#controls {
-    border-radius: 8px;
-    background: black;
-    grid-column-start: 1;
-    grid-column-end: 3;
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;
-    grid-gap: 10px;
-}
+foo = (xs, y) -&gt;
+    while xs.pop! &gt; y
+        console.log &quot;greater&quot;
+</code></pre>
+<p>ryce tries to go a little further.</p>
+<pre><code>def foo xs y
+    while xs :pop &gt; y
+        console:log #greater
+</code></pre>
+<h3 id="inside-out-expressions">inside-out expressions</h3>
+<p>look at this JS expression.</p>
+<pre><code>min(x, y + round(sqrt(z)))
+</code></pre>
+<p>how would we calculate that, step by step?</p>
+<pre><code>take the square root of z. round it. add y.
+take the minimum of the result and x.
+</code></pre>
+<p>that&#39;s inside out. with relatively simple expressions like this, that&#39;s not too bad. with more complex expressions, you get lisp. and who the heck wants to read lisp?</p>
+<p>here&#39;s the same expression in ryce.</p>
+<pre><code>z | sqrt | round | + y | min x
+</code></pre>
+<p>take that, lisp.</p>
+<hr>
+<h2 id="learning-how-to-cook">learning how to cook</h2>
+<h3 id="comments">comments</h3>
+<p>ryce uses <code>//</code> for single-line comments, and <code>///</code> for indentation based block comments.</p>
+<pre><code>// this is a comment
 
-.button {
-    display: grid;
-    border-radius: 8px;
-    place-content: center;
-    background: #161616;
-    color: #E6E1DC;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    -khtml-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    font: 16pt/normal 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'Source Code Pro', 'source-code-pro', monospace;
-}
+/// block comment
+    all of this
+    is one comment
+</code></pre>
+<p>this is working code.</p>
+<pre><code>while x &lt; 10
+    x = x + 1
+    log x
+</code></pre>
+<p>and now it&#39;s a comment.</p>
+<pre><code>/// while x &lt; 10
+    x = x + 1
+    log x
+</code></pre>
+<p>there are also inline comment, wrapped in <code>[]</code>.</p>
+<pre><code>range [from] x [to] y
+</code></pre>
+<h3 id="expressions">expressions</h3>
+<p>expressions consist of one head segment, and zero or more tail segments.</p>
+<p>there are three basic types of head segments.</p>
+<pre><code>// a single value
+5
 
-.button:hover {
-    background: #202020;
-}
+// a function call
+foo x y
 
-.button:active {
-    background: rgb(255, 65, 65);
-}
+// another expression, wrapped in parentheses
+(x + y)
+</code></pre>
+<p>a head segment can <code>yield</code> and/or <code>await</code>.</p>
+<pre><code>yield 5
+await foo x y
+yield await (x + y)
+</code></pre>
+<p>we can then &#39;pipe&#39; this value through tail segments, to change it.</p>
+<pre><code>// pipe into function
+x | sqrt
 
-body {
-    background-color: black;
-    display: grid;
-    grid-template-rows: 10fr 1fr;
-    grid-template-columns: 1fr 1fr;
-    margin: 0;
-    height: 100vh;
-    grid-gap: 10px;
-    padding: 10px;
-    box-sizing: border-box;
-}
+// pipe into function with additional arguments
+x | max y
 
-.ace-merbivore .ace_cursor {
-  color: #FFFFFF;
-  border: 0px;
-  border-bottom: 1px solid #c0c0c0;
-  animation: none;
-}
+// pipe into method
+str | :trim
 
-</style>
+// pipe into method with additional arguments
+str | :match x
 
+// pipe into operator
+x | + y
+</code></pre>
+<p>here are those same expressions, with equivalent javascript.</p>
+<pre><code>x | sqrt
+Math.sqrt(x)
+
+x | max y
+max(x, y)
+
+str | :trim
+str.trim()
+
+str | :match x
+str.match(x)
+
+x | + y
+x + y
+</code></pre>
+<p>if you pipe into a function, the piped value becomes its first argument.
+if you pipe into a method, the piped value becomes the object that the method is called on.
+if you pipe into an operator, the piped value becomes its left operand.</p>
+<p>the pipe symbol <code>|</code> is optional for methods and operators. for functions, we can prefix the function name with a dot instead. these all work.</p>
+<pre><code>x .abs
+x | abs
+
+x .max y
+x | max y
+
+str :trim
+str | :trim
+
+str :match x
+str | :match x
+
+x | + y
+x + y
+</code></pre>
+<p>the last example shows an important difference between ryce and most other programming languages. here&#39;s another example.</p>
+<pre><code>// these two expressions are the same
+x | + y | * z
+x + y * z
+</code></pre>
+<p>values always move through the pipe left to right. there is no operator precedence happening here.</p>
+<p>this doesn&#39;t only apply to arithmatic operators, but also comparison operators.</p>
+<pre><code>// this line has a bug
+x + y * z &gt; n / m
+
+// it&#39;s the same as this
+x | + y | * z | &gt; n | / m
+</code></pre>
+<p>first we are adding <code>x</code> and <code>y</code>. then we multiply the result by <code>z</code>. then we check if the result is greater than <code>n</code>. this results in a boolean. finally, we are trying to divide the boolean by <code>m</code>.</p>
+<p>that&#39;s probably not what we want, right? we can fix this by using sub expressions, wrapped in parentheses.</p>
+<pre><code>x + y * z &gt; (n / m)
+
+// it&#39;s the same as this
+x | + y | * z | &gt; (n | / m)
+</code></pre>
+<p>you can put a line break before a tail segment to break up longer expressions.</p>
+<pre><code>foo a b | :reverse | bar x
+| baz y | + (sqrt z) | log
+
+foo a b :reverse .bar x
+.baz y + (sqrt z) .log
+</code></pre>
+<h3 id="assignment">assignment</h3>
+<p>we can also assign to variables in our expressions. there are three ways to do this.</p>
+<p>standard assignment. an expression can have one <code>name =</code> before the head segment. this is the main exception to the &#39;read everything from left to right rule&#39;.</p>
+<pre><code>n = min x y | + z
+</code></pre>
+<p>this is not allowed.</p>
+<pre><code>n = m = min x y | + z
+</code></pre>
+<p>tail assignment (or in-pipe) assignment. <code>:: name</code> can be used like any other operator in the pipe.</p>
+<pre><code>min x y | + z | :: n
+</code></pre>
+<p>and again, the pipe symbol <code>|</code> is optional.</p>
+<pre><code>min x y + z :: n
+</code></pre>
+<p>why use this, instead of standard assignment? because we can keep the pipe going.</p>
+<pre><code>m = min x y | + z | :: n | * 5 | sqrt
+</code></pre>
+<p>here we store an intermediate result in <code>n</code>, then keep doing more calculations, and store the final result in <code>m</code>.</p>
+<p>updating assignment. if the head segment consists of a single variable, we can assign the result of the entire expression back into that variable, by putting <code>!</code> after the variable name.</p>
+<pre><code>x! + 1
+x = x + 1
+
+str! :toUpperCase
+str = str :toUpperCase
+
+x! | sqrt
+x = x | sqrt
+</code></pre>
+<p>ryce does not have <code>+=</code>, <code>-=</code>, <code>++i</code>, etc. we use updating assignment for that. (unfortunately ryce has no equivalent for <code>i++</code>)</p>
+<p>there&#39;s also a simple version of destructuring assignment.</p>
+<pre><code>// array destructuring
+(x y z) = coordinates
+
+// object destructuring
+(:name :age :id) = person
+</code></pre>
+<p>unlike javascript, ryce does not allow nested destructuring pattern and default values.</p>
+<p>rest properties (<code>...name</code> in js) work only for arrays.</p>
+<pre><code>(x y ~zs) = coordinates
+</code></pre>
+<p>conditional assignment only assings the given value if the current value of the variable is <code>undefined</code> or <code>null</code>.</p>
+<pre><code>x? = 200
+</code></pre>
+<h3 id="calling-functions-and-methods">calling functions and methods</h3>
+<p>a function call is just the name of the function, followed by the arguments.</p>
+<pre><code>foo a b c
+</code></pre>
+<p>to call a function without arguments, use the <code>~</code> placeholder.</p>
+<pre><code>foo ~
+</code></pre>
+<p>this does only apply to head segments.</p>
+<pre><code>foo ~ | bar | baz a b
+</code></pre>
+<p>note: no <code>~</code> after bar.</p>
+<p>methods work the same way.</p>
+<pre><code>str:trim ~
+str:match x
+</code></pre>
+<p>here&#39;s something a bit tricky. earlier, we saw this example</p>
+<pre><code>str :trim
+</code></pre>
+<p>in ryce, spaces matter. <code>str :trim</code> is the same as <code>str | :trim</code>. it&#39;s a tail segment, so no <code>~</code>.
+here are three expressions with their equivalent javascript.</p>
+<pre><code>str:trim
+str.trim
+
+str:trim ~
+str.trim()
+
+str :trim
+str.trim()
+</code></pre>
+<p>of course you can use sub expressions in parentheses as arguments too.</p>
+<pre><code>foo (x + y) (bar z) (baz ~)
+</code></pre>
+<p>if you have a lot of arguments, you can use an indented argument block.</p>
+<pre><code>someFunction
+    argumentOne
+    argumentTwo
+    argumentThree
+</code></pre>
+<p>each line is treated as a subexpression, so we can rewrite our example from earlier like this.</p>
+<pre><code>foo
+    x + y
+    bar z
+    baz ~
+</code></pre>
+<p>we also have spread syntax (<code>...name</code> in js).</p>
+<pre><code>foo ~list
+</code></pre>
+<h3 id="defining-functions">defining functions</h3>
+<p>ryce has four types of function definitions.</p>
+<p>the <code>def</code> statement.</p>
+<pre><code>def foo x y z
+    return x + y * z
+</code></pre>
+<p><code>def</code> keyword, followed by function name, optionally followed by paramaters, followed by indented function body.</p>
+<p>the <code>=&gt;</code> expression.</p>
+<pre><code>list :map =&gt; elem index
+    return &quot;the element at index [index] is [elem]&quot;
+</code></pre>
+<p><code>=&gt;</code> , optionally followed by paramaters, followed by indented function body.</p>
+<p>the <code>-&gt;</code> expression.</p>
+<pre><code>strings | filter -&gt; &amp;length &lt; 12
+</code></pre>
+<p><code>-&gt;</code> followed by a single expression. automatically returns the value of that expression.</p>
+<p>the <code>{}</code> expression.</p>
+<pre><code>strings | map { * 2 }
+</code></pre>
+<p>a single expression, wrapped in curly braces. automatically returns the value of that expression.</p>
+<p>okay, the last two examples looked a bit weird, right? what is <code>&amp;</code>? what are we multiplying? let me explain.</p>
+<p>ryce lets you refer to arguments/parameters, without having to name them. in JS, you can do this with the <code>arguments</code> array (technically not a real array). ryce uses <code>&amp;</code>.</p>
+<p>here&#39;s a list of ryce expressions and the equivalent javascript.</p>
+<pre><code>&amp;0 = arguments[0]
+&amp;1 = arguments[1]
+&amp;  = arguments[0]
+&amp;x = arguments[0].x
+&amp;&amp; = arguments
+</code></pre>
+<p>so <code>&amp;length</code> is just the length of the first (well, 0th) argument.</p>
+<p>in <code>-&gt;</code> and <code>{}</code> functions, you can use an expression without a head segment. ryce will just add <code>&amp;</code> as a head segment for you. so these two functions are the same.</p>
+<pre><code>strings | map { * 2 }
+strings | map { &amp; * 2 }
+</code></pre>
+<p>look how tiny that function is. so cute!</p>
+<p>if you really want to name your paramaters though, <code>-&gt;</code> and <code>{}</code> functions allow you to add a list of paramaters at the start of the function, seperated from the function body with a comma.</p>
+<pre><code>list :map -&gt; elem index, &quot;the element at index [index] is [elem]&quot;
+list :map { elem index, &quot;the element at index [index] is [elem]&quot; }
+</code></pre>
+<p>all four types of functions also support rest paramaters (<code>...name</code> in js).</p>
+<pre><code>def foo ~x
+    ...
+
+=&gt; ~x
+    ...
+
+-&gt; ~x, ...
+
+{ ~x, ... }
+</code></pre>
+<h3 id="strings">strings</h3>
+<pre><code>&quot;hello world&quot;
+&#39;hello world&#39;
+
+// string interpolation
+
+&quot;hello [thing]&quot;
+
+// arrow string, goes to the end of the line
+// nothing needs to be escaped
+
+~&gt; look ma! no backslashes! &quot;&#39;[]&#39;&quot;
+
+// multi-line arrow string
+// indentation based
+
+~&gt;
+    oooooooonnnnnneeeeee
+    looooooonnnnnnnnnnng
+    striiiiiiiiiiiiiiing
+
+// word strings
+console.log #hello
+</code></pre>
+<h3 id="numbers">numbers</h3>
+<pre><code>100
+1.5
+.55
+
++100
++1.5
++.55
+
+-100
+-1.5
+-.55
+
+// non-decimal bases
++F109/16
+-F109/16
+
+0050
++0050
+-0050
+
+100_000
++100_000
+-100_000
+</code></pre>
+<p>some of these aren&#39;t implemented yet.</p>
+<h3 id="objects">objects</h3>
+<pre><code>x: 10 y: 20
+
+// sub expressions as values
+x: 10 y: (10 + 10)
+
+// in a function call
+foo a x: 10 y:20 b c
+
+// same as
+foo a (x: 10 y: 20) b c
+
+// two objects in function call
+foo a x: 10 y: 20 b speed: 240 reverse: true c
+
+// same as
+foo a (x: 10 y: 20) b (speed: 240 reverse: true) c
+
+// two objects in function call
+// without other paramaters to seperate them
+foo (x: 10 y: 20) (speed: 240 reverse: true)
+
+// extends
+x: 10 y: 20 extends point
+
+// same as
+x: 10 y: 20 __proto__: point
+</code></pre>
+<h3 id="operators">operators</h3>
+<pre><code>x + y   // addition
+x - y   // subtraction
+x / y   // division
+x * y   // multiplication
+x % y   // remainder
+x ** y  // exponentiation
+x // y  // integer division
+x %% y  // modulo
+
+x == y  // loose equality
+x != y  // loose inequality
+x &gt; y   // greater than
+x &lt; y   // less than
+x &gt;= y  // greater or equal
+x &lt;= y  // less or equal
+
+x &gt;&gt; y   // y:push x
+x &lt;&lt; y   // x:push y
+
+x and y  // and
+x or y   // or
+
+x is y        // strict equality
+x is not y    // strict inequality
+</code></pre>
+<p>some of these aren&#39;t implemented yet.</p>
+<h3 id="conditionals">conditionals</h3>
+<pre><code>opt index &gt; 5
+    foo x
+alt index &lt; 5
+    bar x
+alt default
+    baz x
+</code></pre>
+<p><code>opt</code>  = <code>if</code> (stands for optional)
+<code>alt</code> = <code>else if</code> (stands for alternative)
+<code>alt default</code> = <code>else</code></p>
+<p>this is probably my least favorite part of ryce. as keywords, <code>opt</code> and <code>alt</code> are ... awkward. but they do line up nicely with the indented code. i&#39;ve looked at the syntax for conditionals in many different programming languages, and i don&#39;t really like any of them. so far, this is the best i&#39;ve got.</p>
+<p>some statements can have an <code>if</code> or <code>unless</code> before them.</p>
+<pre><code>if x &gt; y
+do log &quot;danger!&quot;
+
+unless x :isEven
+return false
+
+if x &gt; y do log &quot;danger!&quot;
+
+unless x :isEven return false
+</code></pre>
+<p>this works with <code>return</code>, <code>throw</code>, <code>for</code>, <code>while</code>, <code>break</code>, <code>continue</code>, and <code>do</code> statements.
+<code>do</code> simply takes an expression and runs it. it turns an expression into a statement.</p>
+<h3 id="loops">loops</h3>
+<pre><code>while x &gt; y
+    foo a b
+
+until x &gt; y
+    foo a b
+
+for char in chars
+    log char
+
+for x of y
+    log x
+</code></pre>
+<p><code>for ... in</code> and <code>for ... of</code> loops work like in javascript ... except they are switched.
+<code>for ... in</code> compiles to <code>for ... of</code>, and <code>for ... of</code> compiles to <code>for ... in</code>.
+so they actually work more like in coffeescript and livescript. got that? good.</p>
+<p><code>break</code> and <code>continue</code> work like in javascript (for real this time). labels start and end with <code>/</code>.</p>
+<pre><code>for word in sentence /outer_loop/
+    for char in word
+        log char
+        if char is #x
+        break outer_loop
+</code></pre>
+<h2 id="wait-waht">wait, waht??</h2>
+<p>by now you&#39;re probably thinking &quot;wow, ryce is the best language i&#39;ve ever seen!&quot;
+you&#39;re right, of course, but there are some things about ryce that are a bit ... strange.</p>
+<p>these are not mistakes. they&#39;re not things i couldn&#39;t figure out. i like them the way they are. but they are strange, and you, dear reader, might not like them. you have been warned.</p>
+<h3 id="ryce-does-not-have-array-literals">ryce does not have array literals</h3>
+<p>listen up, arrays. you. are. not. special.
+why should you get your own literal, when maps and sets don&#39;t?
+what if i want to make my own data structures? they don&#39;t get literals, do they?</p>
+<p>so, how do we make an array? functions.</p>
+<pre><code>array = { Array:from &amp;&amp; }
+
+berries = array #straw #blue #rasp 
+</code></pre>
+<p>let&#39;s make another function.</p>
+<pre><code>object = -&gt; &amp; or (Object:new ~)
+</code></pre>
+<pre><code>chicago = object
+    state: #illinois
+    travel: object
+        train: true
+        plane: true
+        boat: true
+    capital: false
+    names: array
+        &quot;city of chicago&quot;
+        &quot;windy city&quot;
+</code></pre>
+<p>you may have noticed we used <code>Object:new</code>. that method doesn&#39;t exist in normal javascript. what&#39;s going on there?</p>
+<h3 id="ryce-does-not-have-a-new-keyword">ryce does not have a <code>new</code> keyword</h3>
+<p>we don&#39;t need it. we just use functions!</p>
+<pre><code>Function::new = { Reflect:construct @ &amp;&amp; }
+</code></pre>
+<p><code>Function::new</code> is short for <code>Function:prototype:new</code>
+<code>@</code> is the same as <code>this</code>. (<code>@foo</code> is the same as <code>this:foo</code>)
+<code>Reflect:construct</code> <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Reflect/construct">is like the new operator, but as a function</a></p>
+<p>too me, that little function is beautiful. and yes, we just modified a built-in object.
+your parents probably told you to never ever do that, but we did it anyway.
+ryce is for rebels.</p>
+<h3 id="ryce-does-not-have-a-negation-operator">ryce does not have a negation operator</h3>
+<p>but we can make a <code>not</code> function.</p>
+<pre><code>def not arg
+    if arg return false
+    return true
+</code></pre>
+<p>probably not as efficent as a negation operator, but ... meh.</p>
+<h3 id="ryce-does-not-have-bracket-notation">ryce does not have bracket notation</h3>
+<p>in javascript, we have this.</p>
+<pre><code>x[y + 1]
+x[y + 1] = z
+</code></pre>
+<p>in ryce, we have functions.</p>
+<pre><code>Object::getProp = { Reflect:get @ ~&amp;&amp; }
+Object::setProp = { Reflect:set @ ~&amp;&amp; }
+
+x:get (y + 1)
+x:set (y + 1) z
+</code></pre>
+<pre><code>Array::get = { @ :at &amp; }
+Array::set = { @ :splice &amp;0 1 &amp;1 }
+
+arr:get 0
+arr:get -1
+
+arr:set 0 &quot;january&quot;
+arr:set -1 &quot;december&quot;
+</code></pre>
+<h3 id="ryce-does-not-have-errors">ryce does not have errors</h3>
+<p>remember when i said <code>str:trim</code> was the same as <code>str.trim</code> in javascript. that wasn&#39;t true.
+it&#39;s actually <code>str?.trim</code>. in ryce, being (slightly) safe(er) from undefined and null is the default. yay!</p>
+
+</div>
