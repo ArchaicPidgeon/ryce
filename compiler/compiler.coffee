@@ -1125,9 +1125,9 @@ generate =
     pipeOp: (subNodes) ->
         op = subNodes[0]
         if op is '>>'
-            return "#{subNodes[1]}.push(#{pVal})"
+            return "$push(#{subNodes[1]}, #{pVal})"
         if op is '<<'
-            return "#{pVal}.push(#{subNodes[1]})"
+            return "$push(#{pVal}, #{subNodes[1]})"
         return [pVal, op, subNodes[1]].join ''
 
     biOp: (content) ->
@@ -1205,6 +1205,13 @@ generate =
 
     stringInterp: (content) ->
         return '(' + (content.join '+') + ')'
+
+    blockString: (content) ->
+        lines = content.split('\n')[1..]
+        spaces = lines[0].match(/[ ]*/)[0].length
+        lines = lines.map (line) -> line[spaces..]
+        res = JSON.stringify lines.join('\n')
+        return res
 
     blockFunc: (content) ->
         kw = content[0]

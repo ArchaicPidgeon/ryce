@@ -1505,10 +1505,10 @@
       var op;
       op = subNodes[0];
       if (op === '>>') {
-        return `${subNodes[1]}.push(${pVal})`;
+        return `$push(${subNodes[1]}, ${pVal})`;
       }
       if (op === '<<') {
-        return `${pVal}.push(${subNodes[1]})`;
+        return `$push(${pVal}, ${subNodes[1]})`;
       }
       return [pVal, op, subNodes[1]].join('');
     },
@@ -1629,6 +1629,16 @@
     },
     stringInterp: function(content) {
       return '(' + (content.join('+')) + ')';
+    },
+    blockString: function(content) {
+      var lines, res, spaces;
+      lines = content.split('\n').slice(1);
+      spaces = lines[0].match(/[ ]*/)[0].length;
+      lines = lines.map(function(line) {
+        return line.slice(spaces);
+      });
+      res = JSON.stringify(lines.join('\n'));
+      return res;
     },
     blockFunc: function(content) {
       var args, block, kw;
