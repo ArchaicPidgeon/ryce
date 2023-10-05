@@ -16,7 +16,7 @@ run = (x) -> x()
 ##########################################################################################
 
 la_old = '(?=[, :})#\\]]|\\n|$)' # look ahead
-la = '(?=[, })\\]]|\\n|$)' # look ahead - no prop access
+la = '(?=[,})\\] ]|\\n|$)' # look ahead - no prop access
 
 numRegexA =
 ///^ [+-]? ( [0-9A-Z]+[.][0-9A-Z]+ | [.][0-9A-Z]+ | [0-9A-Z]+ )/[0-9]+ #{la} ///i
@@ -29,21 +29,21 @@ operatorRegex =
 
 reservedWordRegex = /// ^(def|await|yield|outer|var|let|return
 |break|continue|comment|lang|default|while|until|loop|for|of|in
-|ever|if|unless|else|opt|alt|do|try|catch|finally) #{la} ///
+|ever|if|unless|else|opt|alt|do|try|catch|finally|debugger) #{la} ///
 
-forbiddenWordsRegex = /// ^[.]?(class|inherits|case|debugger|new|delete|function|
+forbiddenWordsRegex = /// ^[.]?(class|inherits|case|new|delete|function|
 instanceof|typeof|switch|typeof|void|with|const|export|import|super|let|
 static|enum|implements|interface|package|private|protected|public) #{la} ///
 
 nameRegexA =
     ///^~?
     ( @?[a-zA-Z_$][a-zA-Z0-9_$]* | &[a-zA-Z_$][a-zA-Z0-9_$]* | &[0-9]+ | && | & | @ )
-    ( [?]?(\.|:|::)[a-zA-Z_$][a-zA-Z0-9_$]* )* [?!]? #{la}
+    ( (:|::)[a-zA-Z_$][a-zA-Z0-9_$]+ | :[0-9]+ )* [?!]? #{la}
     ///
 
 nameRegexB =
     ///^
-    ( [.:]?[a-zA-Z_$][a-zA-Z0-9_$]* ) ( [?]?(\.|:)[a-zA-Z_$][a-zA-Z0-9_$]* )* [?]?
+    ( [.:][a-zA-Z_$][a-zA-Z0-9_$]* ) ( (:|::)[a-zA-Z_$][a-zA-Z0-9_$]+ | :[0-9]+ )*
     #{la}
     ///
 
@@ -53,8 +53,6 @@ tokenize = (charStream, logMode) ->
 
     if charStream.match(/[ ]?[^\n ]/)[0].length > 1
         throw 'bad indent at start of file'
-
-    litMode = false
 
     tokenFuncs = {}
 
@@ -113,13 +111,6 @@ tokenize = (charStream, logMode) ->
 
     ######################################################################################
 
-    tokenFuncs.litComment = ->
-        return false unless litMode
-        res = charStream[idx..].match /^\n[^ \n].+/
-        return false unless res
-        eat {type: 'comment', content: res[0]}
-        return true
-
     tokenFuncs.forbidden = ->
         res = charStream[idx..].match forbiddenWordsRegex
         if res
@@ -133,7 +124,7 @@ tokenize = (charStream, logMode) ->
     tokenFuncs.comma = -> scanToken 'comma', '^,' + la
     tokenFuncs.wave = -> scanToken 'wave', '^~' + la
     tokenFuncs.pipe = -> scanToken 'pipe', '^\\|' + la
-    tokenFuncs.key = -> scanToken 'key', '^[a-zA-Z][a-zA-Z0-9_$]*[:;]' + la
+    tokenFuncs.key = -> scanToken 'key', '^[a-zA-Z_$][a-zA-Z0-9_$]*[:;]' + la
     tokenFuncs.extends = -> scanToken 'key', '^extends' + la
     tokenFuncs.name = -> scanToken 'name', nameRegexA
     tokenFuncs.tag = -> scanToken 'tag', '^<(\\w+)(#\\w+)?(\\.\\w+)*>' + la
@@ -160,12 +151,12 @@ tokenize = (charStream, logMode) ->
     tokenFuncs.stringDouble = -> scanToken 'string', ///^"(?:\\.|[^"[])*"#{la}///
 
     tokenFuncs.stringStart = -> scanToken 'stringStart', ///^"(?:\\.|[^"[])*\[///
-    tokenFuncs.stringMiddle = -> scanToken 'stringMiddle', ///^](?:\\.|[^"[])*\[#{la}///
+    tokenFuncs.stringMiddle = -> scanToken 'stringMiddle', ///^](?:\\.|[^"[])*\[///
     tokenFuncs.stringEnd = -> scanToken 'stringEnd', ///^](?:\\.|[^"[])*"#{la}///
 
-    tokenFuncs.commentBlockA = -> scanTokenBlock 'comment', "^###"
+    #tokenFuncs.commentBlockA = -> scanTokenBlock 'comment', "^###"
     tokenFuncs.commentBlockB = -> scanTokenBlock 'comment', "^///"
-    tokenFuncs.commentLineA = -> scanToken 'comment', "^##.*"
+    #tokenFuncs.commentLineA = -> scanToken 'comment', "^##.*"
     tokenFuncs.commentLineB = -> scanToken 'comment', "^//.*"
 
     tokenFuncs.endOfFile = ->
@@ -233,6 +224,8 @@ tokenize = (charStream, logMode) ->
     advance = ->
 
         for funcName, func of tokenFuncs
+            #log funcName
+            #log '' + charStream[idx..].match /^.*/
             return funcName isnt 'endOfFile' if func()
 
         throw 'ERROR: unable to identify token at index ' +
@@ -245,8 +238,6 @@ tokenize = (charStream, logMode) ->
         if (token.type is 'key') and (token.content is 'extends')
             token.content = '__proto__:'
             #log token
-
-    tokenStream.shift() if litMode
 
     return tokenStream.filter (token) ->
         token.type not in ['space', 'comment', 'emptyLine']
@@ -514,11 +505,11 @@ parse = (tokenStream) ->
         if hasArguments()
             until token.type is 'comma'
                 if token.content.startsWith '~'
-                    throw 'bad soak' unless nextToken?.type is 'comma'
+                    throw 'bad rest param' unless nextToken?.type is 'comma'
                 content.push parseTerminal()
             parseTerminal()
 
-        if (canStartHead token) or (token.type in ['biOp', 'dotName'])
+        if (canStartHead token) or (token.type in ['dotName', 'biOp', 'pipe'])
             content.push parseExpression mustBeHead: false, canBeBlock: canBeBlock
         else content.push {type: 'empty', content: ''}
 
@@ -708,7 +699,7 @@ parse = (tokenStream) ->
 
         while isParamName token
             if token.content.startsWith '~'
-                throw 'bad soak' unless nextToken?.type is 'indent'
+                throw 'bad rest param' unless nextToken?.type is 'indent'
             content.push parseTerminal()
 
         throw 'missing block' unless token.type is 'indent'
@@ -727,7 +718,7 @@ parse = (tokenStream) ->
 
         while isParamName token
             if token.content.startsWith '~'
-                throw 'bad soak' unless nextToken?.type is 'indent'
+                throw 'bad rest param' unless nextToken?.type is 'indent'
             content.push parseTerminal()
 
         throw 'missing block' unless token.type is 'indent'
@@ -769,6 +760,8 @@ parse = (tokenStream) ->
                 content.push parseConditional()
             else if token.content in ['break', 'continue']
                 content.push parseLoopControl()
+            else if token.content is 'debugger'
+                content.push parseTerminal()
             else if canStartHead token
                 content.push parseExpression mustBeHead: true, canBeBlock: true
             else if token.type is 'dedent'
@@ -966,6 +959,9 @@ parse = (tokenStream) ->
             tokensSeen.push tokenStream[idx2]
             idx2++
 
+    parseFail = (fail) ->
+        fail + '\n' + JSON.stringify tokenStream[idx - 1 .. idx + 5]
+
     parseAssignemnt = ->
         #log 'yay', token, nextToken
         content = []
@@ -981,7 +977,7 @@ parse = (tokenStream) ->
         throw '= expected' unless token.content is '='
         parseTerminal()
 
-        throw 'value expected' unless canStartHead token
+        throw parseFail('value expected') unless canStartHead token
         #content.push parseExpression mustBeHead: true, canBeBlock: true
 
         return {type: 'assignment', content}
@@ -1172,15 +1168,17 @@ generate =
 
     name: (content) ->
         res = content
-        res = res.replaceAll('::', '?.prototype?.')
+        res = res.replace('&&', 'arguments')
+        res = res.replace('&', 'arguments[0]?.')
+        res = res.replace /\?\.$/, ''
+        #res = res.replaceAll('::', '?.prototype?.')
+        res = res.replaceAll /::([a-zA-Z0-9_$]+)/g, '?.[$1]'
+        res = res.replaceAll /:([0-9]+)/g, '?.[$1]'
         res = res.replaceAll(':', '?.')
         res = res.replace('@', 'this.')
-        res = res.replace('&&', 'arguments')
         res = res.replace /^&([0-9]+)/, 'arguments[$1]'
         res = res.replace /^&([^.]+)/, 'arguments[0].$1'
-        res = res.replace('&', 'arguments[0]')
         res = res.replace('~', '...')
-        res = res.replace '].', ']'
         if res is 'this.' then res = 'this'
         return res.replace '!', ''
 
@@ -1287,7 +1285,7 @@ generate =
         return "#{label}for(#{nameA} #{kw} #{expr}){#{block}}"
 
     if: (content) -> "if(#{content[0]}){#{content[1]}}"
-    unless: (content) -> "if(not #{content[0]}){#{content[1]}}"
+    unless: (content) -> "if(!#{content[0]}){#{content[1]}}"
 
     var: -> return ''
     outer: -> return ''
@@ -1322,130 +1320,48 @@ generate =
 
 ##########################################################################################
 
-getOptions = (code) ->
+fn = (arr) ->
+    arr.code = -> @[0]
+    arr.debug = -> @[1]
+    return arr
 
-    res = code.match /^[ \n]*### ryce [\s\S]*?\n###/
+ryce = (ry, js) ->
 
-    if res
-        code = code[res[0].length - 3 ..]
-        res = res[0].split('\n').filter (arg) -> ':' in arg
-    else
-        res = code.match(/^([ \n]*\[.*?\])*/)[0].slice(1, -1).split(/\][ \n]*\[/)
+    recipe = [
+        tokenize
+        parse
+        translate
+    ]
 
-    options = { script: [], style: [], macro: [] }
-    for pair in res
-        [key, ...val] = pair.split ':'
-        val = val.join(':').trim()
-        key = key.trim()
-        val = val.split ' ' if key is 'mode'
-        if key in ['script', 'style', 'macro']
-        then options[key].push val
-        else options[key] = val
-    return [code, options]
+    obj = {}
+    res = {}
 
-buildPage = (code, options) ->
-    res = ["<!doctype html>"]
-    res.push "<title>#{options.title or "untitled"}</title>"
-    for style in options.style
-        res.push "<link rel=\"stylesheet\" href=\"#{style}\">"
-    for script in options.script
-        res.push "<script src=\"#{script}\"></script>"
-    res.push "<script>\n#{code}</script>"
-    return res.join '\n'
+    try eval js
+    catch err
+        res.failedAt = 'js'
+        res.error = err
+        return fn [ null, res ]
 
-format = (arg) -> arg
+    for step in recipe
 
-func = (line) ->
-    if line.startsWith '###'
-        return ''
-    if line.match /^ *$/
-        return ''
-    if line.startsWith '    '
-        return line[4..]
-    throw 'bad line'
+        try ry = step ry
+        catch err
+            res.failedAt = step.name
+            res.error = err
+            ry = null
+            break
 
-compile = (code) ->
+        res[step.name] = ry
 
-    [code, options] = getOptions code
+    return fn [ ry, res ]
 
-    #log options
-
-    if code.match /^[ \n]*###/
-        code = code.split('\n').map(func).join('\n')
-    #log code
-
-    code = @tokenize code
-    code = @parse code
-    code = @translate code
-    code = @format code
-
-    if options.title
-        code = buildPage code, options
-
-    return code
-
-ryce = { tokenize, parse, translate, format, compile }
-
-ryce.compile = compile.bind ryce
+ryce.tokenize = tokenize
+ryce.parse = parse
+ryce.translate = translate
+ryce.compile = ryce
 
 ##########################################################################################
 
-if module?
-then module.exports = ryce
-else globalThis.ryce = ryce
+globalThis.ryce = ryce
 
 ##########################################################################################
-
-test = '''
-[mode: html] [title: test] [script: index.zq]
-[macro: blurb.zq] [macro: foo-bar.zq] [style: blurb.css]
-
-log = console:log
-'''
-
-# code | tokenize | parse | translate | format
-
-###
-
-TODO: maybe
-
-    keywords: debugger, delete, import, export
-    numeric literals: bigInt, exponential (1e3)
-    macros
-
-TODO: cleanup
-
-    store the tokenizer functions in an array, instead of an object
-
-    make tokenBlock with a regex based
-
-    bring some order and sepertion to the parse functions
-
-TODO:
-X handle complex:names
-X handle ~soak and ~spread
-X handle key;
-X handle {args, ...}
-X check @x, &1, &x, &, &&
-
-X labels
-X try / catch / finally
-X throw
-
-no 'new' operator. use Reflect.construct instead.
-
-classes?
-
-class foo extends bar
-
-    def constructor a b
-        ...
-
-    def baz c d
-        ...
-
-----
-
-  global foo bar baz
-
-###
